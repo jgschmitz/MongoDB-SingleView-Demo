@@ -1,0 +1,9 @@
+function $mergeObjects(...items) {
+  return {
+    $arrayToObject: {
+      $setUnion: items.map(_ => (
+        {$filter: {input: {$objectToArray: _}, cond: {$ne: ["$$this.v", null]}}}
+      ))
+    }
+  }
+}
