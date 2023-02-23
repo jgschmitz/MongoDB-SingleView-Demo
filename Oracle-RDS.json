@@ -8,7 +8,7 @@
      "Engine" : "oracle-ee",
      "LicenseModel" : "bring-your-own-license",
      "MasterUsername" : "master",
-     "MasterUserPassword" : "SecretPassword01"
+     "MasterUserPassword" : ""
  },
  "DeletionPolicy" : "Snapshot"
 }
