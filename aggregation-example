@@ -1,31 +1,71 @@
-db.shared_step_infos.explain("allPlansExecution").aggregate(
-  [ { $sort: { "branch" : 1 } },
-    { $skip: 0 },
-    { $limit: 50 },
-    { $graphLookup: { from: "branches_shared_step",
-                      startWith: "$_id",
-                      connectFromField: "sharedStepInfoId",
-                      connectToField: "childSharedStepInfoIds",
-                      as: "stepParents",
-                      maxDepth: 10,
-                      restrictSearchWithMatch: { branch: "master" } } },
-    { $lookup: { from: "branches_test",
-                 let: { "id": "$_id" },
-                 pipeline: [{ $match: { "branch": "master",
-					"isArchived": { $ne: true },
-					"$expr": { "$in": ["$$id", "$childSharedStepInfoIds"] } } }],
-                 as: "testParents" } },
-    { $addFields: { stepParents: { $map: { "input": "$stepParents", "as": "p", "in": "$$p.sharedStepInfoId" } },
-                    testParents: { $map: { "input": "$testParents", "as": "p", "in": "$$p.testId" } } } },
-    { $lookup: { from: "branches_test",
-                 let: { "stepParents": "$stepParents" },
-                 pipeline: [{ $match: { "branch": "master",
-					"isArchived": { $ne: true }, } },
-                            { $project: { _id: "$testId",
-                                         common: { $setIntersection: ["$$stepParents", "$childSharedStepInfoIds"] } } },
-                            { $match: { common: { $exists: true, $ne: [] } } }],
-                 as: "testStepParents" } },
-    { $addFields: { testStepParents: { $map: { input: "$testStepParents", as: "p", in: "$$p._id" } } } },
-    { $project: { _id: 1, created_at: 1, hidden: 1, type: 1, name: 1, updated_at: 1,
-                  usage: { $size: { $setUnion: ["$testParents", "$testStepParents"] } } } }
-  ])
+db.shared_step_infos.aggregate([
+  { $sort: { "branch": 1 } },  // Ensure index on "branch"
+  
+  { $graphLookup: { 
+      from: "branches_shared_step", 
+      startWith: "$_id", 
+      connectFromField: "sharedStepInfoId", 
+      connectToField: "childSharedStepInfoIds", 
+      as: "stepParents", 
+      maxDepth: 10, 
+      restrictSearchWithMatch: { branch: "master" } 
+    } 
+  },
+
+  { $lookup: { 
+      from: "branches_test", 
+      let: { id: "$_id" }, 
+      pipeline: [
+        { $match: { 
+            branch: "master", 
+            isArchived: { $ne: true }, 
+            $expr: { $in: ["$$id", "$childSharedStepInfoIds"] } 
+          } 
+        }
+      ], 
+      as: "testParents" 
+    } 
+  },
+
+  { $addFields: { 
+      stepParents: { 
+        $map: { input: "$stepParents", as: "p", in: "$$p.sharedStepInfoId" } 
+      }, 
+      testParents: { 
+        $map: { input: "$testParents", as: "p", in: "$$p.testId" } 
+      } 
+    } 
+  },
+
+  { $lookup: { 
+      from: "branches_test", 
+      let: { stepParents: "$stepParents" }, 
+      pipeline: [
+        { $match: { branch: "master", isArchived: { $ne: true } } }, 
+        { $project: { _id: "$testId", common: { $setIntersection: ["$$stepParents", "$childSharedStepInfoIds"] } } }, 
+        { $match: { common: { $exists: true, $ne: [] } } }
+      ], 
+      as: "testStepParents" 
+    } 
+  },
+
+  { $addFields: { 
+      testStepParents: { $map: { input: "$testStepParents", as: "p", in: "$$p._id" } } 
+    } 
+  },
+
+  { $project: { 
+      _id: 1, 
+      created_at: 1, 
+      hidden: 1, 
+      type: 1, 
+      name: 1, 
+      updated_at: 1, 
+      usage: { $size: { $setUnion: ["$testParents", "$testStepParents"] } } 
+    } 
+  },
+
+  { $skip: 0 },
+  { $limit: 50 }
+]);
+
