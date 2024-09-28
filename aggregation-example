@@ -1,7 +1,9 @@
 db.shared_step_infos.aggregate([
   { $sort: { "branch": 1 } },  // Ensure index on "branch"
-  
-  { $graphLookup: { 
+
+  // Graph Lookup to find stepParents
+  { 
+    $graphLookup: { 
       from: "branches_shared_step", 
       startWith: "$_id", 
       connectFromField: "sharedStepInfoId", 
@@ -12,7 +14,9 @@ db.shared_step_infos.aggregate([
     } 
   },
 
-  { $lookup: { 
+  // Lookup for testParents
+  { 
+    $lookup: { 
       from: "branches_test", 
       let: { id: "$_id" }, 
       pipeline: [
@@ -27,7 +31,9 @@ db.shared_step_infos.aggregate([
     } 
   },
 
-  { $addFields: { 
+  // Add fields for stepParents and testParents
+  { 
+    $addFields: { 
       stepParents: { 
         $map: { input: "$stepParents", as: "p", in: "$$p.sharedStepInfoId" } 
       }, 
@@ -37,7 +43,9 @@ db.shared_step_infos.aggregate([
     } 
   },
 
-  { $lookup: { 
+  // Lookup for testStepParents
+  { 
+    $lookup: { 
       from: "branches_test", 
       let: { stepParents: "$stepParents" }, 
       pipeline: [
@@ -49,12 +57,16 @@ db.shared_step_infos.aggregate([
     } 
   },
 
-  { $addFields: { 
+  // Add field for testStepParents
+  { 
+    $addFields: { 
       testStepParents: { $map: { input: "$testStepParents", as: "p", in: "$$p._id" } } 
     } 
   },
 
-  { $project: { 
+  // Project the necessary fields and calculate usage
+  { 
+    $project: { 
       _id: 1, 
       created_at: 1, 
       hidden: 1, 
@@ -65,7 +77,6 @@ db.shared_step_infos.aggregate([
     } 
   },
 
-  { $skip: 0 },
-  { $limit: 50 }
+  { $skip: 0 },  // Pagination step
+  { $limit: 50 } // Pagination limit
 ]);
-
